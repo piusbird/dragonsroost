@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" type="text/css" href="/assets/style.css">
+{% if title %}
+	<title> {{title}} - The Treefornt </title>
+{% else %}
+	<title> The Treefort </title>
+{% endif %}
+</head>
+<body id="top">
+<div class="sidenav">
+
+🏳️‍🌈 <a href="https://en.pronouns.page/@piusbird">Pronouns</a> <br/>
+🍍<a href="https://piusbird.space/wordpress/">My Blog</a><br/>
+<li>📼 <a href="https://www.youtube.com/user/publicvoidmarnold/">YouTube</a><br/>
+
+</div>
+<main> 
+{% block content %}
+{% endblock content %}
+</main>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1> {{total}}</h1>
+{% for post in postList %}
+<p>
+    <b> {{post.Date}} </b> <a href="{{post.Url}}"> {{post.Title}}</a> <br/>
+</p>
+{% endfor %}
+{% endblock content %}
