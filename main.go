@@ -103,7 +103,7 @@ func blogLanding(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error()+" Failed to open database", 550)
 	}
 	var allPost []models.Post
-	result := db.Find(&allPost).Order("created_at DESC")
+	result := db.Order("created_at DESC").Find(&allPost)
 	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusBadRequest)
 		return

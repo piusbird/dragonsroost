@@ -38,7 +38,7 @@ func (a PostMetaByDate) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a PostMetaByDate) Less(i, j int) bool {
 	timeI, _ := time.Parse(time.RFC1123, a[i].Date)
 	timeJ, _ := time.Parse(a[j].Date, time.RFC1123)
-	return timeI.After(timeJ)
+	return timeI.Before(timeJ)
 }
 func postsToStructs() (list.List, error) {
 	files, err := ioutil.ReadDir("content/posts")
