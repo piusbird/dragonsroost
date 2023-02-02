@@ -6,6 +6,13 @@ import (
 	"gorm.io/gorm"
 )
 
+type LogEntry struct {
+	ForUser  string
+	Type     int16
+	Affected string
+	gorm.Model
+}
+
 type Post struct {
 	ID        uint
 	Title     string

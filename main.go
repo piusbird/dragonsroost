@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -24,6 +23,7 @@ import (
 	"github.com/yuin/goldmark"
 	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer/html"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"piusbird.space/dragonsroost/models"
@@ -42,6 +42,9 @@ func renderMarkdownPage(pagename string) (Page, error) {
 
 	}
 	markdown := goldmark.New(
+		goldmark.WithRendererOptions(
+			html.WithUnsafe(),
+		),
 		goldmark.WithExtensions(
 			meta.Meta,
 		),
@@ -71,27 +74,35 @@ func imageRedir(w http.ResponseWriter, r *http.Request) {
 	return
 }
 func renderPage(w http.ResponseWriter, r *http.Request) {
+
 	vars := mux.Vars(r)
-	if vars["page"] == "" {
+	switch vars["page"] {
+	case "":
 		p, err := renderMarkdownPage("index")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusExpectationFailed)
+			return
 		}
 		tplPage.ExecuteWriter(pongo2.Context{"title": p.Title, "page": p}, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusExpectationFailed)
 
 		}
-	}
-	p, err := renderMarkdownPage(vars["page"])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusExpectationFailed)
+	case "blog":
+		http.Redirect(w, r, "/blog/", http.StatusMovedPermanently)
 		return
-	}
-	tplPage.ExecuteWriter(pongo2.Context{"title": p.Title, "page": p}, w)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusExpectationFailed)
-		return
+	default:
+		p, err := renderMarkdownPage(vars["page"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		tplPage.ExecuteWriter(pongo2.Context{"title": p.Title, "page": p}, w)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusExpectationFailed)
+
+		}
 	}
 
 }
@@ -142,6 +153,7 @@ func setupDatabase(w http.ResponseWriter, req *http.Request) {
 	db.AutoMigrate(&models.Key{})
 	db.AutoMigrate(&models.Page{})
 	db.AutoMigrate(&models.Post{})
+	db.AutoMigrate(&models.LogEntry{})
 	posts, err := postsToStructs()
 	if err != nil {
 		http.Error(w, "Import Error Posts "+err.Error(), 550)
@@ -182,6 +194,9 @@ func getBlogPost(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, ok.Error.Error(), http.StatusNotFound)
 	}
 	markdown := goldmark.New(
+		goldmark.WithRendererOptions(
+			html.WithUnsafe(),
+		),
 		goldmark.WithExtensions(
 			meta.Meta,
 		),
@@ -199,8 +214,16 @@ func getBlogPost(w http.ResponseWriter, req *http.Request) {
 
 }
 func UpdatePost(w http.ResponseWriter, r *http.Request) {
-	nBytes, _ := io.ReadAll(r.Body)
-	log.Printf("%v", nBytes)
+	// TODO Break this into seperate functions later on
+	// Protocal Inspired by ssh+ Debian Package uploads
+	// The Idea is you toss a signed bit of Json
+	// At the server describing what you want to create, delete or unpublish
+	// And if you're in the keyring the server does the thing you want to do
+
+	// Uses Ed25519 keys from nacl/sodium for signing/auth
+
+	// TODO Add loggingm un database
+	// TODO Add delete/unpublish verbs
 	actor := r.Header.Get("X-Username")
 	if actor == "" {
 		http.Error(w, "Must Set Username", http.StatusFailedDependency)
@@ -216,6 +239,9 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Cannot open database connection", http.StatusInternalServerError)
 		return
 	}
+	// Only copy into the buffer once we are sure all preconditions are met
+
+	uploadBuffer, _ := io.ReadAll(r.Body)
 	var actorInfo models.Key
 	res := db.Where("user = ?", actor).First(&actorInfo)
 	log.Printf("%v", actorInfo)
@@ -224,19 +250,7 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
-		log.Println(err.Error())
-		http.Error(w, "body fetch error", http.StatusFailedDependency)
-		return
-	}
-	data, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Upload Error", http.StatusInternalServerError)
-		return
-	}
-	log.Printf("%s %d", "Len of data", len(data))
-
-	buf := string(nBytes)
+	buf := string(uploadBuffer)
 	msg, err := base64.StdEncoding.DecodeString(buf)
 	if err != nil {
 		http.Error(w, "Upload Error", http.StatusInternalServerError)
@@ -244,8 +258,10 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("%d", len(msg))
+	// The public key comes out of the database as a base64 encoded string
+	// Needs to go in a 32 byte non encoded buffer for nacl to verify
 	var pubKey [32]byte
-	pubKeyData, err := base64.StdEncoding.DecodeString(testKey)
+	pubKeyData, err := base64.StdEncoding.DecodeString(actorInfo.Key)
 
 	if err != nil {
 		log.Println(err.Error())
@@ -253,24 +269,32 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(pubKeyData) != 32 {
-		http.Error(w, "keydat for user is bad", http.StatusInternalServerError)
+		http.Error(w, "keydata for user is bad", http.StatusInternalServerError)
 		return
 	}
 	copy(pubKey[:], pubKeyData)
+
+	// The signed data will be encrypted to the public key, because
+	// Signing 💡 this returns the unencrypted form if it can
 
 	raw_json, ok := sign.Open(nil, msg, &pubKey)
 	if !ok {
 		http.Error(w, "Crypto error ", http.StatusForbidden)
 		return
 	}
-	log.Printf(string(raw_json))
+
 	var upload JsonUpload
 	err = json.Unmarshal(raw_json, &upload)
 	if err != nil {
 		http.Error(w, "Json error "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	var logTransact models.LogEntry
+	logTransact.ForUser = actorInfo.User // Better to log who the user actually was,
+	// rather then who they said that they were
+
 	oType, _ := strconv.ParseInt(upload.Type, 10, 16)
+	logTransact.Type = int16(oType)
 	if oType == Undefined {
 		http.Error(w, "Undefined Type", http.StatusForbidden)
 		return
@@ -287,8 +311,11 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			result = db.Create(&newPost)
 			defer r.Body.Close()
+			logTransact.Affected = newPost.Slug
+			db.Create(&logTransact)
 			w.Header().Set("Content-Type", "text/plain")
 			io.WriteString(w, "ok: "+string(result.RowsAffected))
+
 			return
 
 		}
@@ -300,6 +327,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Submit Error!", http.StatusInternalServerError)
 			return
 		}
+		logTransact.Affected = oldPost.Slug
+		db.Create(&logTransact)
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, "ok: "+string(result.RowsAffected)+"\n")
 		return
@@ -317,6 +346,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			result = db.Create(&newPost)
 			defer r.Body.Close()
+			logTransact.Affected = newPost.ShortName
+			db.Create(&logTransact)
 			w.Header().Set("Content-Type", "text/plain")
 			io.WriteString(w, "ok: "+string(result.RowsAffected)+"\n")
 			return
@@ -330,6 +361,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Submit Error!", http.StatusInternalServerError)
 			return
 		}
+		logTransact.Affected = oldPost.ShortName
+		db.Create(&logTransact)
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, "ok: "+string(result.RowsAffected)+"\n")
 		return
@@ -352,6 +385,10 @@ func main() {
 
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
 	port := os.Getenv("PORT")
+	newdsn := os.Getenv("DSN")
+	if newdsn != "" {
+		dsn = newdsn
+	}
 	if port == "" {
 		port = "12345"
 	}
