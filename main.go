@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 
 	"time"
 
@@ -65,14 +64,6 @@ func renderMarkdownPage(pagename string) (Page, error) {
 
 var tplPage = pongo2.Must(pongo2.FromFile("templates/page.html"))
 
-func imageRedir(w http.ResponseWriter, r *http.Request) {
-	oldpath := r.URL.Path
-	assetPath := strings.TrimPrefix("/blog/", oldpath)
-	newurl, _ := url.JoinPath(r.Host, "/assets/", assetPath)
-	io.WriteString(w, newurl)
-	//http.Redirect(w, r, newurl, http.StatusMovedPermanently)
-	return
-}
 func renderPage(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
@@ -222,7 +213,6 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 
 	// Uses Ed25519 keys from nacl/sodium for signing/auth
 
-	// TODO Add loggingm un database
 	// TODO Add delete/unpublish verbs
 	actor := r.Header.Get("X-Username")
 	if actor == "" {
@@ -374,13 +364,11 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/{page}", renderPage)
 	r.HandleFunc("/", renderPage)
-	r.HandleFunc("/images/", imageRedir)
 	r.HandleFunc("/api/upload", UpdatePost).Methods("POST")
 
 	r.HandleFunc("/setup/", setupDatabase)
 	blogroute := r.PathPrefix("/blog").Subrouter()
 	blogroute.HandleFunc("/", blogLanding)
-	blogroute.PathPrefix("/images/").Handler(http.StripPrefix("/images/", http.FileServer(http.Dir("./assets/images"))))
 	blogroute.HandleFunc("/{slug}", getBlogPost)
 
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
