@@ -26,3 +26,10 @@ type Page struct {
 	Sidebar   bool
 	gorm.Model
 }
+
+type Key struct {
+	ID   uint
+	User string
+	Key  string
+	gorm.Model
+}

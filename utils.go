@@ -30,6 +30,22 @@ type PostMeta struct {
 	ShortDesc string
 	Url       string
 }
+type EnityType int16
+
+const (
+	Undefined = 0
+	typePage  = 1
+	typePost  = 2
+)
+
+type JsonUpload struct {
+	Type  string
+	Title string
+	Date  string
+	Body  string
+}
+
+var testKey = "nR6FC9GHk+olScO5FPpUYoppgo95SHvd5UJKKFt4Crs="
 
 type PostMetaByDate []PostMeta
 
