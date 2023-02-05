@@ -456,7 +456,7 @@ func main() {
 	}
 
 	server := http.Server{Handler: r}
-	if unixsock != "" {
+	if unixsock == "" {
 		unixListener, err := net.Listen("unix", unixsock)
 		if err != nil {
 			panic(err)
