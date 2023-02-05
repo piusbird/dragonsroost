@@ -472,6 +472,12 @@ func main() {
 
 		}
 		unixListener, err := net.Listen("unix", unixsock)
+
+		if err != nil {
+			log.Fatalln(err)
+
+		}
+		err = os.Chmod(unixsock, 0770)
 		if err != nil {
 			log.Fatalln(err)
 		}
