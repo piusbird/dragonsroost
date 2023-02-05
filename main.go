@@ -447,7 +447,7 @@ func main() {
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
 	port := os.Getenv("PORT")
 	newdsn := os.Getenv("DSN")
-	unixsock := os.Getenv("SOCKPAYH")
+	unixsock := os.Getenv("SOCKPATH")
 	if newdsn != "" {
 		dsn = newdsn
 	}
@@ -456,7 +456,7 @@ func main() {
 	}
 
 	server := http.Server{Handler: r}
-	if unixsock == "" {
+	if unixsock != "" {
 		unixListener, err := net.Listen("unix", unixsock)
 		if err != nil {
 			panic(err)
