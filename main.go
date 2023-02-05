@@ -445,6 +445,16 @@ func main() {
 	blogroute.HandleFunc("/{slug}", getBlogPost)
 
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
+	f, err := os.OpenFile("blog-backend.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+
+	if err != nil {
+
+		log.Fatalf("error opening file: %v", err)
+
+	}
+
+	defer f.Close()
+
 	port := os.Getenv("PORT")
 	newdsn := os.Getenv("DSN")
 	unixsock := os.Getenv("SOCKPATH")
@@ -457,10 +467,15 @@ func main() {
 
 	server := http.Server{Handler: r}
 	if unixsock != "" {
+		if err := os.RemoveAll(unixsock); err != nil {
+			log.Fatalln(err)
+
+		}
 		unixListener, err := net.Listen("unix", unixsock)
 		if err != nil {
-			panic(err)
+			log.Fatalln(err)
 		}
+		log.SetOutput(f)
 		server.Serve(unixListener)
 
 	} else {
@@ -469,6 +484,7 @@ func main() {
 		if err != nil {
 			log.Fatal("ListenAndServe: ", err)
 		}
+		log.SetOutput(f)
 
 	}
 
