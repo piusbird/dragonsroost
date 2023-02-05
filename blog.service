@@ -1,0 +1,13 @@
+[Unit]
+Description=Treefort Blog Service
+After=network.target
+
+[Service]
+User=blog
+Group=www-data
+ExecStart=/home/blog/runservice.sh
+Type=forking
+PIDFile=/home/blog/blog.pid
+
+[Install]
+WantedBy=default.target
