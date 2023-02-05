@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<h1> {{total}}</h1>
+<h1> Notes from the Treefort</h1>
+<p>  If you  have a compatible reader check out my <a href="/feeds/rss"> Rss feed</a> <br/>
+Also avalible in <a href="/feeds/json"> Json</a>  <a href="/feeds/atom"> Atom</a></p>
 {% for post in postList %}
 <p>
     <b> {{post.Date}} </b> <a href="{{post.Url}}"> {{post.Title}}</a> <br/>

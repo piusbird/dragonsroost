@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"golang.org/x/crypto/nacl/sign"
 
 	"github.com/flosch/pongo2/v6"
+	"github.com/gorilla/feeds"
 	"github.com/yuin/goldmark"
 	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/parser"
@@ -96,6 +98,88 @@ func renderPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+}
+
+func rssFeed(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		http.Error(w, "Error establishing database connection", http.StatusInternalServerError)
+		return
+	}
+	var schema = "http://"
+	if req.TLS != nil {
+		schema = "https://"
+	}
+	baseURL := schema + req.Host
+
+	feed := &feeds.Feed{
+		Title:       "Notes From the Treefort",
+		Link:        &feeds.Link{Href: "https://treefort.piusbird.space/rss"},
+		Description: "The Pius Bird's blog",
+		Author:      &feeds.Author{Name: "Matt Arnold"},
+		Created:     time.Now(),
+	}
+	var feedItems []*feeds.Item
+	var feedData []models.Post
+	markdown := goldmark.New(
+		goldmark.WithRendererOptions(
+			html.WithUnsafe(),
+		),
+		goldmark.WithExtensions(
+			meta.Meta,
+		),
+	)
+	result := db.Where("public = ?", true).Order("created_at DESC").Limit(RSS_NUMPOST).Find(&feedData)
+	if result.Error != nil {
+		http.Error(w, "Database Error", http.StatusInternalServerError)
+		return
+
+	}
+	for i := 0; i < len(feedData); i++ {
+		item := feedData[i]
+		var buf bytes.Buffer
+		context := parser.NewContext()
+		if err := markdown.Convert(item.Text, &buf, parser.WithContext(context)); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		finalUrl, _ := url.JoinPath(baseURL, "/blog/", item.Slug)
+
+		feedItems = append(feedItems,
+			&feeds.Item{
+				Id:          string(item.ID),
+				Title:       item.Title,
+				Link:        &feeds.Link{Href: finalUrl},
+				Description: buf.String(),
+				Created:     item.CreatedAt,
+			})
+	}
+	feed.Items = feedItems
+	var feedCtype string
+	switch vars["type"] {
+	case "json":
+		finalFeed, _ := feed.ToJSON()
+		feedCtype = "application/json"
+		w.Header().Set("Content-Type", feedCtype)
+		io.WriteString(w, finalFeed)
+		return
+	case "atom":
+		finalFeed, _ := feed.ToAtom()
+		feedCtype = "application/atom+xml"
+		w.Header().Set("Content-Type", feedCtype)
+		io.WriteString(w, finalFeed)
+		return
+	case "rss":
+		finalFeed, _ := feed.ToRss()
+		feedCtype = "application/rss+xml"
+		w.Header().Set("Content-Type", feedCtype)
+		io.WriteString(w, finalFeed)
+		return
+
+	}
+
+	return
 }
 
 var tplBlogLanding = pongo2.Must(pongo2.FromFile("templates/blog.html"))
@@ -214,21 +298,29 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 	// Uses Ed25519 keys from nacl/sodium for signing/auth
 
 	// TODO Add delete/unpublish verbs
-	actor := r.Header.Get("X-Username")
-	if actor == "" {
-		http.Error(w, "Must Set Username", http.StatusFailedDependency)
-		return
-	}
-	content := r.Header.Get("Content-Type")
-	if content != "application/json+signed" {
-		http.Error(w, "Must sign all requests", http.StatusFailedDependency)
-		return
-	}
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		http.Error(w, "Cannot open database connection", http.StatusInternalServerError)
 		return
 	}
+	var faildUploadLog models.LogEntry
+	faildUploadLog.Type = typeFailed
+	faildUploadLog.ForUser = string(r.RemoteAddr)
+	faildUploadLog.Affected = "EUSER"
+	actor := r.Header.Get("X-Username")
+	if actor == "" {
+		db.Create(&faildUploadLog)
+		http.Error(w, "Must Set Username", http.StatusFailedDependency)
+		return
+	}
+	content := r.Header.Get("Content-Type")
+	if content != "application/json+signed" {
+		faildUploadLog.Affected = "ESIG"
+		db.Create(&faildUploadLog)
+		http.Error(w, "Must sign all requests", http.StatusFailedDependency)
+		return
+	}
+
 	// Only copy into the buffer once we are sure all preconditions are met
 
 	uploadBuffer, _ := io.ReadAll(r.Body)
@@ -236,6 +328,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 	res := db.Where("user = ?", actor).First(&actorInfo)
 	log.Printf("%v", actorInfo)
 	if res.Error != nil {
+		faildUploadLog.Affected = "ENOKEY"
+		db.Create(&faildUploadLog)
 		http.Error(w, "Unable to fetch user", http.StatusInternalServerError)
 		return
 	}
@@ -243,6 +337,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 	buf := string(uploadBuffer)
 	msg, err := base64.StdEncoding.DecodeString(buf)
 	if err != nil {
+		faildUploadLog.Affected = "EIEIO"
+		db.Create(&faildUploadLog)
 		http.Error(w, "Upload Error", http.StatusInternalServerError)
 		return
 	}
@@ -254,7 +350,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 	pubKeyData, err := base64.StdEncoding.DecodeString(actorInfo.Key)
 
 	if err != nil {
-		log.Println(err.Error())
+		faildUploadLog.Affected = "EIOKEY"
+		db.Create(&faildUploadLog)
 		http.Error(w, "Server side key decode error", http.StatusFailedDependency)
 		return
 	}
@@ -269,6 +366,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 
 	raw_json, ok := sign.Open(nil, msg, &pubKey)
 	if !ok {
+		faildUploadLog.Affected = "EBADSIG"
+		db.Create(&faildUploadLog)
 		http.Error(w, "Crypto error ", http.StatusForbidden)
 		return
 	}
@@ -276,6 +375,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 	var upload JsonUpload
 	err = json.Unmarshal(raw_json, &upload)
 	if err != nil {
+		faildUploadLog.Affected = "EIOJSON"
+		db.Create(&faildUploadLog)
 		http.Error(w, "Json error "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -286,6 +387,8 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 	oType, _ := strconv.ParseInt(upload.Type, 10, 16)
 	logTransact.Type = int16(oType)
 	if oType == Undefined {
+		faildUploadLog.Affected = "EWRONGVERB"
+		db.Create(&faildUploadLog)
 		http.Error(w, "Undefined Type", http.StatusForbidden)
 		return
 	}
@@ -348,6 +451,9 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		oldPost.Text = []byte(upload.Body)
 		result = db.Save(&oldPost)
 		if result.Error != nil {
+			faildUploadLog.ForUser = actorInfo.User
+			faildUploadLog.Affected = "ESUBMIT"
+			db.Create(&faildUploadLog)
 			http.Error(w, "Submit Error!", http.StatusInternalServerError)
 			return
 		}
@@ -365,6 +471,7 @@ func main() {
 	r.HandleFunc("/{page}", renderPage)
 	r.HandleFunc("/", renderPage)
 	r.HandleFunc("/api/upload", UpdatePost).Methods("POST")
+	r.HandleFunc("/feeds/{type}", rssFeed)
 
 	r.HandleFunc("/setup/", setupDatabase)
 	blogroute := r.PathPrefix("/blog").Subrouter()
@@ -374,6 +481,7 @@ func main() {
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
 	port := os.Getenv("PORT")
 	newdsn := os.Getenv("DSN")
+	unixsock := os.Getenv("SOCKPAYH")
 	if newdsn != "" {
 		dsn = newdsn
 	}
@@ -381,9 +489,21 @@ func main() {
 		port = "12345"
 	}
 
-	http.Handle("/", r)
-	err := http.ListenAndServe(":"+port, nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+	server := http.Server{Handler: r}
+	if unixsock != "" {
+		unixListener, err := net.Listen("unix", unixsock)
+		if err != nil {
+			panic(err)
+		}
+		server.Serve(unixListener)
+
+	} else {
+		server.Addr = ":" + port
+		err := server.ListenAndServe()
+		if err != nil {
+			log.Fatal("ListenAndServe: ", err)
+		}
+
 	}
+
 }

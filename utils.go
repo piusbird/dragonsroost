@@ -33,10 +33,12 @@ type PostMeta struct {
 type EnityType int16
 
 const (
-	Undefined = 0
-	typePage  = 1
-	typePost  = 2
+	Undefined  = 0
+	typePage   = 1
+	typePost   = 2
+	typeFailed = 3
 )
+const RSS_NUMPOST = 10
 
 type JsonUpload struct {
 	Type  string
