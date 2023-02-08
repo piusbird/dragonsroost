@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -11,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"time"
@@ -432,11 +435,116 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		http.Error(w, "Cannot open database connection", http.StatusInternalServerError)
+		return
+	}
+	var faildUploadLog models.LogEntry
+	faildUploadLog.Type = typeFailed
+	faildUploadLog.ForUser = string(r.RemoteAddr)
+	faildUploadLog.Affected = "EUSER"
+	actor := r.Header.Get("X-Username")
+	if actor == "" {
+		db.Create(&faildUploadLog)
+		http.Error(w, "Must Set Username", http.StatusFailedDependency)
+		return
+	}
+	signedHash := r.Header.Get("X-Upload-Sig")
+	if signedHash == "" {
+		faildUploadLog.Affected = "ESIG"
+		db.Create(&faildUploadLog)
+		http.Error(w, "Must sign all requests", http.StatusFailedDependency)
+		return
+	}
+	fileName := r.Header.Get("X-Upload-Filename")
+	if fileName == "" {
+		faildUploadLog.Affected = "ENOFILENAME"
+		db.Create(&faildUploadLog)
+		http.Error(w, "Must set file name", http.StatusBadRequest)
+		return
+	}
+
+	uploadBuffer, _ := io.ReadAll(r.Body)
+	var actorInfo models.Key
+	res := db.Where("user = ?", actor).First(&actorInfo)
+	log.Printf("%v", actorInfo)
+	if res.Error != nil {
+		faildUploadLog.Affected = "ENOKEY"
+		db.Create(&faildUploadLog)
+		http.Error(w, "Unable to fetch user", http.StatusInternalServerError)
+		return
+	}
+
+	buf := string(signedHash)
+	msg, err := base64.StdEncoding.DecodeString(buf)
+	if err != nil {
+		faildUploadLog.Affected = "EIEIO"
+		db.Create(&faildUploadLog)
+		http.Error(w, "Upload Error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("%d", len(msg))
+	// The public key comes out of the database as a base64 encoded string
+	// Needs to go in a 32 byte non encoded buffer for nacl to verify
+	var pubKey [32]byte
+	pubKeyData, err := base64.StdEncoding.DecodeString(actorInfo.Key)
+
+	if err != nil {
+		faildUploadLog.Affected = "EIOKEY"
+		db.Create(&faildUploadLog)
+		http.Error(w, "Server side key decode error", http.StatusFailedDependency)
+		return
+	}
+	if len(pubKeyData) != 32 {
+		http.Error(w, "keydata for user is bad", http.StatusInternalServerError)
+		return
+	}
+	copy(pubKey[:], pubKeyData)
+	submitHash, ok := sign.Open(nil, msg, &pubKey)
+	if !ok {
+		faildUploadLog.Affected = "ECRYPTO"
+		db.Create(&faildUploadLog)
+		http.Error(w, "Signiture failed verify", http.StatusBadRequest)
+		return
+	}
+	actualHash := sha256.New()
+	io.Copy(actualHash, bytes.NewReader(uploadBuffer))
+	shStr := hex.EncodeToString(submitHash)
+	ahStr := hex.EncodeToString(actualHash.Sum(nil))
+	if ahStr != shStr {
+		faildUploadLog.Affected = "EHASH"
+		log.Printf("%s vs %s", ahStr, shStr)
+		db.Create(&faildUploadLog)
+		http.Error(w, "Hash validation failed", http.StatusBadRequest)
+		return
+	}
+	targetPath := filepath.Join("assets", "uploads", fileName)
+	err = os.RemoveAll(targetPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInsufficientStorage)
+		return
+	}
+	fh, err := os.Create(targetPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInsufficientStorage)
+		return
+	}
+	io.Copy(fh, bytes.NewReader(uploadBuffer))
+	fh.Close()
+	w.WriteHeader(http.StatusAccepted)
+	io.WriteString(w, "Ok\n")
+	return
+
+}
 func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/{page}", renderPage)
 	r.HandleFunc("/", renderPage)
-	r.HandleFunc("/api/upload", UpdatePost).Methods("POST")
+	r.HandleFunc("/api/post", UpdatePost).Methods("POST")
+	r.HandleFunc("/api/upload", uploadHandler).Methods("POST")
 	r.HandleFunc("/feeds/{type}", rssFeed)
 
 	r.HandleFunc("/setup/", setupDatabase)
