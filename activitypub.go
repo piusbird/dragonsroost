@@ -12,19 +12,11 @@ var apActor = `{
 	  "https://treefort.piusbird.space/users/piusbird"
 	],
 	"links": [
-	  {
-		"rel": "http://webfinger.net/rel/profile-page",
-		"type": "text/html",
-		"href": "https://treefort.piusbird.space/u/@piusbird"
-	  },
+	
 	  {
 		"rel": "self",
 		"type": "application/activity+json",
 		"href": "https://treefort.piusbird.space/u/piusbird"
-	  },
-	  {
-		"rel": "http://ostatus.org/schema/1.0/subscribe",
-		"template": "https://treefort.piusbird.space/authorize_interaction?uri={uri}"
 	  }
 	]
   }
