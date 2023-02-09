@@ -553,6 +553,9 @@ func main() {
 	blogroute.HandleFunc("/{slug}", getBlogPost)
 
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
+	r.HandleFunc("/.well-known/webfinger", webfingeRequest)
+	apRoute := r.PathPrefix("/u").Subrouter()
+	apRoute.HandleFunc("/u/piusbird", serveUser)
 	f, err := os.OpenFile("blog-backend.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
 	if err != nil {
