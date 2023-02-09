@@ -58,3 +58,9 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 	return
 
 }
+
+func serveProfileHtml(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "https://treefort.piusbird.space/index", http.StatusMovedPermanently)
+	return
+
+}
