@@ -554,9 +554,9 @@ func main() {
 
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
 	r.HandleFunc("/.well-known/webfinger", webfingeRequest)
-	apRoute := r.PathPrefix("/u").Subrouter()
-	apRoute.HandleFunc("/piusbird", serveUser)
-	apRoute.HandleFunc("/@piusbird", serveProfileHtml)
+
+	r.HandleFunc("/u/piusbird", serveUser)
+	r.HandleFunc("/u/@piusbird", serveProfileHtml)
 
 	f, err := os.OpenFile("blog-backend.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
