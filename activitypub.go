@@ -26,9 +26,15 @@ var user = `{
 	  "https://www.w3.org/ns/activitystreams",
 	  "https://w3id.org/security/v1"
 	],
-	"id": "https://treefort.piusbird.space/actor",
+	"id": "https://treefort.piusbird.space/u/piusbird",
 	"type": "Person",
 	"preferredUsername": "piusbird",
+	"name": "Pius the Unscrootched",
+	"summary": "Server Server Server",
+	"manuallyApprovesFollowers": true,
+    "discoverable": true,
+    "published": "1984-04-20T00:00:00Z",
+
 	"inbox": "https://treefort.piusbird.space/inbox",
 	"publicKey": {
 	  "id": "https://treefort.piusbird.space/u/piusbird/key",
