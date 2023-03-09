@@ -13,11 +13,11 @@ I use a custom built screen reader-ish program to well read stuff on the compute
 
 I will make a post on how to get it working in a non me sort of context later possibly tomrrow. In the meantime I'll say you need to rewrite vsss.conf.in for your system. So far as I'm aware Cepstral Swift is the only speech engine that supports the hooks needed for the fancy on screen graphics
 
-When i upgraded to [#Fedora](https://tilde.zone/tags/Fedora) 35 on Thursday it stopped working. Not a problem in my code. I checked. Here's what went down, and why i'm so mad. Basically you have three options for text to speech on linux. First Espeak, Second Svox, (android tts) Third proprietary software synthesizer. And yes i know about the CMU stuff and hardware options. But for various reasons those aren't viable in my case
+When i upgraded to [#Fedora](https://treefort.piusbird.space/tags/Fedora) 35 on Thursday it stopped working. Not a problem in my code. I checked. Here's what went down, and why i'm so mad. Basically you have three options for text to speech on linux. First Espeak, Second Svox, (android tts) Third proprietary software synthesizer. And yes i know about the CMU stuff and hardware options. But for various reasons those aren't viable in my case
 
 For various reasons i've used option 3 for the better part of 15 years now. And changing my computer voice now would be a huge adjustment. So the dirty little secret of most non-free speech synthesizers is they treat Linux/Unix as a third class platform. i.e most of the decently priced ones are still using OSS apis in 2021This hasn't been a problem as pulseaudio has this nice LD\_PRELOAD shim, that turns OSS apps into regular pulse clients.
 
-You wouldn't think this would be a big deal for pipewire either; it is backward compatible with pulseaudio clients after all. Turns out it's not. But it turns out that for some reason that was not documented anywhere i could find [#Fedora](https://tilde.zone/tags/Fedora) dropped the shim for it in a recent update.
+You wouldn't think this would be a big deal for pipewire either; it is backward compatible with pulseaudio clients after all. Turns out it's not. But it turns out that for some reason that was not documented anywhere i could find [#Fedora](https://treefort.piusbird.space/tags/Fedora) dropped the shim for it in a recent update.
 
 ## Breaking Changes Strike Again
 

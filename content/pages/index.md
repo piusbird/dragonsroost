@@ -9,8 +9,9 @@ Tags:
 
 Software Engineer, artist, and...
 
-## The Internet's favorite bird person
 
+## The Internet's favorite bird person
+![A Brown owl at a computer surrounded by the demisexual pride colors](/assets/uploads/pius-queer.png "Pius Bird")
 
 
  In the year 2022 THE INTERNET, and 
@@ -40,4 +41,15 @@ To Bring Joy and Delight back into our Digital Lives
 
 Hi I’m Piusbird a/k/a Matt Arnold an independent creator, and artist sort of person. Living with Cerbral Palsy, Autism, and mental health issues. Welcome to my website. Right now it’s just a collection of links, and a blog thing.
 
+## Selected Projects
+[vsss]:<https://git.sr.ht/~marnold128/vsss> A Very simple text to speech orchestrator
 
+[bsigs]:<https://git.sr.ht/~marnold128/bsigs> Cryptographic Practice
+
+[MasterText]:<https://git.sr.ht/~marnold128/mastertext> A web based Content Addressable medium corpus text analysis suite 
+
+[Blue Proxy]:<https://blueproxy.fly.dev/> | [git]:<https://git.sr.ht/~marnold128/poseidon> A Readability Proxy
+
+[This Site]:<https://github.com/piusbird/dragonsroost> The Engine and Templates for this site
+
+LOL
