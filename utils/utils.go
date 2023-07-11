@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bytes"
@@ -17,9 +17,6 @@ import (
 	"piusbird.space/dragonsroost/models"
 )
 
-var dsn = "web:changethis@unix(/var/lib/mysql/mysql.sock)/website?charset=utf8mb4&parseTime=True&loc=Local"
-var timelayout = "2006-01-02"
-
 type Page struct {
 	Title string
 	Html  string
@@ -34,9 +31,9 @@ type EnityType int16
 
 const (
 	Undefined  = 0
-	typePage   = 1
-	typePost   = 2
-	typeFailed = 3
+	TypePage   = 1
+	TypePost   = 2
+	TypeFailed = 3
 )
 const RSS_NUMPOST = 10
 
@@ -47,7 +44,8 @@ type JsonUpload struct {
 	Body  string
 }
 
-var testKey = "nR6FC9GHk+olScO5FPpUYoppgo95SHvd5UJKKFt4Crs="
+var timelayout = "2006-01-02"
+var TestKey = "nR6FC9GHk+olScO5FPpUYoppgo95SHvd5UJKKFt4Crs="
 
 type PostMetaByDate []PostMeta
 
@@ -58,7 +56,7 @@ func (a PostMetaByDate) Less(i, j int) bool {
 	timeJ, _ := time.Parse(a[j].Date, time.RFC1123)
 	return timeI.Before(timeJ)
 }
-func postsToStructs() (list.List, error) {
+func PostsToStructs() (list.List, error) {
 	files, err := ioutil.ReadDir("content/posts")
 	if err != nil {
 		return *list.New(), err
@@ -110,7 +108,7 @@ func postsToStructs() (list.List, error) {
 	return *postList, nil
 }
 
-func pagesToStructs() (list.List, error) {
+func PagesToStructs() (list.List, error) {
 	files, err := ioutil.ReadDir("content/pages")
 	if err != nil {
 		return *list.New(), err

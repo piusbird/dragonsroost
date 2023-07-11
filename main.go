@@ -31,18 +31,19 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"piusbird.space/dragonsroost/models"
+	"piusbird.space/dragonsroost/utils"
 )
 
-func renderMarkdownPage(pagename string) (Page, error) {
+func renderMarkdownPage(pagename string) (utils.Page, error) {
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return Page{}, err
+		return utils.Page{}, err
 	}
 	var result models.Page
 	db.Where("short_name = ?", pagename).First(&result)
 	if result.Text == nil {
-		return Page{}, errors.New("Not found in db")
+		return utils.Page{}, errors.New("not found in db")
 
 	}
 	markdown := goldmark.New(
@@ -56,12 +57,13 @@ func renderMarkdownPage(pagename string) (Page, error) {
 	var buf bytes.Buffer
 	context := parser.NewContext()
 	if err := markdown.Convert(result.Text, &buf, parser.WithContext(context)); err != nil {
-		return Page{}, err
+		ret := utils.Page{}
+		return ret, err
 	}
 	metaData := meta.Get(context)
 	title := metaData["Title"]
 	render := buf.String()
-	retPage := Page{}
+	retPage := utils.Page{}
 	retPage.Title = title.(string)
 	retPage.Html = render
 	return retPage, nil
@@ -151,7 +153,7 @@ func rssFeed(w http.ResponseWriter, req *http.Request) {
 
 		feedItems = append(feedItems,
 			&feeds.Item{
-				Id:          string(item.ID),
+				Id:          string(rune(item.ID)),
 				Title:       item.Title,
 				Link:        &feeds.Link{Href: finalUrl},
 				Description: buf.String(),
@@ -182,7 +184,6 @@ func rssFeed(w http.ResponseWriter, req *http.Request) {
 
 	}
 
-	return
 }
 
 var tplBlogLanding = pongo2.Must(pongo2.FromFile("templates/blog.html"))
@@ -203,12 +204,12 @@ func blogLanding(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, result.Error.Error(), http.StatusBadRequest)
 		return
 	}
-	var newPost []PostMeta
+	var newPost []utils.PostMeta
 	// You might be wondering oh why doesn't he just put the url in the db
 	// STATELESSNESS is the answer
 	for _, post := range allPost {
 		finalUrl, _ := url.JoinPath(baseURL, "/blog/", post.Slug)
-		pm := PostMeta{}
+		pm := utils.PostMeta{}
 		pm.Date = post.CreatedAt.Format(time.RFC1123)
 		pm.Title = post.Title
 		tmp := "Lol"
@@ -251,7 +252,7 @@ func getBlogPost(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var retPage Page
+	var retPage utils.Page
 	retPage.Title = result.Title
 	retPage.Html = buf.String()
 	tplBlog.ExecuteWriter(pongo2.Context{"title": retPage.Title, "post": retPage, "metadata": result}, w)
@@ -273,7 +274,7 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var faildUploadLog models.LogEntry
-	faildUploadLog.Type = typeFailed
+	faildUploadLog.Type = utils.TypeFailed
 	faildUploadLog.ForUser = string(r.RemoteAddr)
 	faildUploadLog.Affected = "EUSER"
 	actor := r.Header.Get("X-Username")
@@ -341,7 +342,7 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var upload JsonUpload
+	var upload utils.JsonUpload
 	err = json.Unmarshal(raw_json, &upload)
 	if err != nil {
 		faildUploadLog.Affected = "EIOJSON"
@@ -355,13 +356,13 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 
 	oType, _ := strconv.ParseInt(upload.Type, 10, 16)
 	logTransact.Type = int16(oType)
-	if oType == Undefined {
+	if oType == utils.Undefined {
 		faildUploadLog.Affected = "EWRONGVERB"
 		db.Create(&faildUploadLog)
 		http.Error(w, "Undefined Type", http.StatusForbidden)
 		return
 	}
-	if oType == typePost {
+	if oType == utils.TypePost {
 		var newPost models.Post
 		var oldPost models.Post
 		newPost.Title = upload.Title
@@ -376,7 +377,7 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 			logTransact.Affected = newPost.Slug
 			db.Create(&logTransact)
 			w.Header().Set("Content-Type", "text/plain")
-			io.WriteString(w, "ok: "+string(result.RowsAffected))
+			io.WriteString(w, "ok: "+string(rune(result.RowsAffected)))
 
 			return
 
@@ -392,11 +393,11 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		logTransact.Affected = oldPost.Slug
 		db.Create(&logTransact)
 		w.Header().Set("Content-Type", "text/plain")
-		io.WriteString(w, "ok: "+string(result.RowsAffected)+"\n")
+		io.WriteString(w, "ok: "+string(rune(result.RowsAffected))+"\n")
 		return
 
 	}
-	if oType == typePage {
+	if oType == utils.TypePage {
 		var newPost models.Page
 		var oldPost models.Page
 		newPost.Title = upload.Title
@@ -411,7 +412,7 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 			logTransact.Affected = newPost.ShortName
 			db.Create(&logTransact)
 			w.Header().Set("Content-Type", "text/plain")
-			io.WriteString(w, "ok: "+string(result.RowsAffected)+"\n")
+			io.WriteString(w, "ok: "+string(rune(result.RowsAffected))+"\n")
 			return
 
 		}
@@ -429,7 +430,7 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		logTransact.Affected = oldPost.ShortName
 		db.Create(&logTransact)
 		w.Header().Set("Content-Type", "text/plain")
-		io.WriteString(w, "ok: "+string(result.RowsAffected)+"\n")
+		io.WriteString(w, "ok: "+string(rune(result.RowsAffected))+"\n")
 		return
 
 	}
@@ -442,7 +443,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var faildUploadLog models.LogEntry
-	faildUploadLog.Type = typeFailed
+	faildUploadLog.Type = utils.TypeFailed
 	faildUploadLog.ForUser = string(r.RemoteAddr)
 	faildUploadLog.Affected = "EUSER"
 	actor := r.Header.Get("X-Username")
@@ -536,7 +537,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	fh.Close()
 	w.WriteHeader(http.StatusAccepted)
 	io.WriteString(w, "Ok\n")
-	return
 
 }
 func main() {
@@ -547,7 +547,6 @@ func main() {
 	r.HandleFunc("/api/upload", uploadHandler).Methods("POST")
 	r.HandleFunc("/feeds/{type}", rssFeed)
 
-	r.HandleFunc("/setup/", setupDatabase)
 	blogroute := r.PathPrefix("/blog").Subrouter()
 	blogroute.HandleFunc("/", blogLanding)
 	blogroute.HandleFunc("/{slug}", getBlogPost)

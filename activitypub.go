@@ -45,18 +45,16 @@ var user = `{
 func webfingeRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/activity+json")
 	io.WriteString(w, apActor)
-	return
+
 }
 
 func serveUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/activity+json")
 	io.WriteString(w, user)
-	return
 
 }
 
 func serveProfileHtml(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "https://treefort.piusbird.space/index", http.StatusMovedPermanently)
-	return
 
 }
