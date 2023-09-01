@@ -32,6 +32,9 @@ func main() {
 
 	}
 	pages, err := utils.PagesToStructs()
+	if err != nil {
+		log.Panic("Cannot convert pages")
+	}
 	for p := pages.Front(); p != nil; p = p.Next() {
 		vl := p.Value.(models.Page)
 		db.Create(&vl)
@@ -42,5 +45,5 @@ func main() {
 	testActor.Key = utils.TestKey
 	testActor.User = "Test"
 	db.Create(&testActor)
-	return
+
 }

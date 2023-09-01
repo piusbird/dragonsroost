@@ -1,0 +1,9 @@
+{% block conversation %}
+<div class="conversation">
+    <div class="conversation-picture">
+        <picture>
+            <img src="/assets/creatures/{{creature}}.png" alt="{{creature}} be {{feeling}}">
+        </picture>
+        <div class="conversation-chat">&lt;<b>{{creature}}</b>&gt; {{message}}</div>
+</div>
+{% endblock %} 

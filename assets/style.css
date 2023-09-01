@@ -133,3 +133,54 @@ footer {
     max-width: 50%;
     height: auto;
   }
+
+  .conversation {
+    margin-top: 0.25rem;
+    display: flex;
+    max-width: calc(65ch + 7rem);
+  }
+  .conversation-standalone {
+    flex: 1;
+    min-width: 6rem;
+    max-width: 6rem;
+    padding-right: 1rem;
+  }
+  
+  .conversation-smol {
+    flex: 1;
+    min-width: 4.5rem;
+    max-width: 4.5rem;
+    padding-right: 1rem;
+  }
+  
+  .conversation-chat {
+    background-color: #3c3836;
+    border-radius: 5px;
+    min-width: 0;
+    padding-top: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-bottom: 0.125rem;
+  }
+  
+  .conversation-chat:before {
+    content: "";
+    position: absolute;
+    height: 15px;
+    width: 15px;
+    box-sizing: border-box;
+    transform: rotate(135deg) translate(0.85rem, 50%);
+    z-index: -1;
+    background-color: inherit;
+  }
+  
+  .conversation-chat ul {
+    padding: 0;
+    margin: 0;
+    margin-top: 0.5ch;
+  }
+  
+  .conversation-chat li ~ li {
+    margin-top: 0.5ch;
+  }
+  

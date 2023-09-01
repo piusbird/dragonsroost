@@ -199,7 +199,7 @@ func blogLanding(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error()+" Failed to open database", 550)
 	}
 	var allPost []models.Post
-	result := db.Order("created_at DESC").Find(&allPost)
+	result := db.Where("public = ?", true).Order("created_at DESC").Find(&allPost)
 	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusBadRequest)
 		return
@@ -238,7 +238,7 @@ func getBlogPost(w http.ResponseWriter, req *http.Request) {
 	if ok.Error != nil {
 		http.Error(w, ok.Error.Error(), http.StatusNotFound)
 	}
-	markdown := goldmark.New(
+	/* markdown := goldmark.New(
 		goldmark.WithRendererOptions(
 			html.WithUnsafe(),
 		),
@@ -247,14 +247,15 @@ func getBlogPost(w http.ResponseWriter, req *http.Request) {
 		),
 	)
 	var buf bytes.Buffer
-	context := parser.NewContext()
-	if err := markdown.Convert(result.Text, &buf, parser.WithContext(context)); err != nil {
+	context := parser.NewContext() */
+	var buf []byte
+	if buf, err = parseRewriteMarkdown(result.Text); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	var retPage utils.Page
 	retPage.Title = result.Title
-	retPage.Html = buf.String()
+	retPage.Html = string(buf[:])
 	tplBlog.ExecuteWriter(pongo2.Context{"title": retPage.Title, "post": retPage, "metadata": result}, w)
 
 }
@@ -369,6 +370,7 @@ func UpdatePost(w http.ResponseWriter, r *http.Request) {
 		newPost.Slug = slugify.Marshal(upload.Title)
 		newPost.CreatedAt, _ = time.Parse(timelayout, upload.Date)
 		newPost.UpdatedAt = time.Now()
+		newPost.Public = true
 		newPost.Text = []byte(upload.Body)
 		result := db.Model(&newPost).Where("title = ?", newPost.Title).First(&oldPost)
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
