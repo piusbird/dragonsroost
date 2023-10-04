@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/flosch/pongo2/v6"
@@ -37,6 +38,7 @@ func parseRewriteMarkdown(text []byte) ([]byte, error) {
 		return nil, errors.New("could not parse markdown")
 	}
 	for c := origTree.FirstChild; c != nil; c = c.NextSibling {
+		log.Printf(" Token is %v", c)
 		customNode := findElement(c, creature_tag)
 		if customNode != nil {
 			msg := fmt.Sprint(customNode.FirstChild.Data)

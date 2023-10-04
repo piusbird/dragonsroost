@@ -73,7 +73,7 @@ blockquote {
 }
 
 footer {
-  align: center;
+  text-align:  center;
 }
 
 @media (prefers-color-scheme: light) {
@@ -154,7 +154,7 @@ footer {
   }
   
   .conversation-chat {
-    background-color: #3c3836;
+    background-color: inherit;
     border-radius: 5px;
     min-width: 0;
     padding-top: 0.5rem;
